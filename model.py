@@ -13,13 +13,13 @@ from os import getcwd
 import csv
 import tensorflow as tf
 import random
-
+import scipy.ndimage
+import matplotlib.pyplot as plt
 def preprocess_image(img, validation=False):
     '''
     resize images as required by th pipeline
     add brightness to images
     introduce shadows to parts of image
-    flip 50 % of imagess
     '''
     processed_img = img[50:140,:,:]
     processed_img = cv2.GaussianBlur(processed_img, (3,3), 0)
@@ -42,17 +42,9 @@ def preprocess_image(img, validation=False):
     start_rand = np.random.randint(0,w)
     end_rand = np.random.randint(start_rand,w)
     processed_img[:,start_rand:end_rand,0] *= np.random.uniform(0.6,0.8)
-
-    # randomly shift horizon
-    h,w,_ = processed_img.shape
-    horizon = 2*h/5
-    v_shift = np.random.randint(-h/8,h/8)
-    pts1 = np.float32([[0,horizon],[w,horizon],[0,h],[w,h]])
-    pts2 = np.float32([[0,horizon+v_shift],[w,horizon+v_shift],[0,h],[w,h]])
-    M = cv2.getPerspectiveTransform(pts1,pts2)
-    processed_img = cv2.warpPerspective(processed_img,M,(w,h), borderMode=cv2.BORDER_REPLICATE)
     processed_img = cv2.resize(processed_img,(200, 66), interpolation = cv2.INTER_AREA)
-    return processed_img.astype(np.uint8)
+    return processed_img
+
 
 def get_data(image_path, angles, batch_size=64, validation=False):
     '''
@@ -68,34 +60,34 @@ def get_data(image_path, angles, batch_size=64, validation=False):
             img = preprocess_image(img, validation)
             if random.random() > 0.5:
                 img = cv2.flip(img, 1)
-                angle *= -1                
+                angle *= -1
+
             X.append(img)
             y.append(angle)
             if len(X) == batch_size:
                 yield (np.array(X), np.array(y))
                 X, y = ([],[])
-                image_path, angles = shuffle(image_path, angles)
+                image_path, angles = shuffle(image_path, angles) 
 
 
 def get_model():
-    ##model
     model = Sequential()
 
     # Normalize
     model.add(Lambda(lambda x: x/127.5 - 1.0,input_shape=(66,200,3)))
-
-    # Add  31x98, 14x47, 5x22 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
-    model.add(Convolution2D(24, 31, 98, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
+    # Add three CNN with kernel size 5,5 and two with kernel size 3,3
+    # Output of the CNN will have dimensions  31x98, 14x47, 5x22 convolution layers (output depth 24, 36, and 48), each with 2x2 stride
+    model.add(Convolution2D(24, 5,5, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(36, 14, 47, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
+    model.add(Convolution2D(36, 15,5, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(48, 5, 22, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
+    model.add(Convolution2D(48, 5,5, subsample=(2, 2), border_mode='same', W_regularizer=l2(0.001)))
     model.add(Activation('relu'))
 
     # Add  3x20, 1x18 convolution layers (output depth 64, and 64)
-    model.add(Convolution2D(64, 3, 20, border_mode='same', W_regularizer=l2(0.001)))
+    model.add(Convolution2D(64, 3, 3, border_mode='same', W_regularizer=l2(0.001)))
     model.add(Activation('relu'))
-    model.add(Convolution2D(64, 1, 18, border_mode='same', W_regularizer=l2(0.001)))
+    model.add(Convolution2D(64, 3, 3, border_mode='same', W_regularizer=l2(0.001)))
     model.add(Activation('relu'))
 
     # Add a flatten layer
@@ -119,7 +111,9 @@ def get_model():
 '''
 Main program 
 '''
-home_dir = [getcwd() + '/custom_data/IMG/', getcwd() + '/data/IMG/']
+# home_dir = [getcwd() + '/1lap/IMG/', getcwd() + '/custom_data/IMG/', getcwd() + '/data/IMG/']
+# csv_path = ['./1lap/driving_log.csv','./custom_data/driving_log.csv','./data/driving_log.csv']
+home_dir = [ getcwd() + '/custom_data/IMG/', getcwd() + '/data/IMG/']
 csv_path = ['./custom_data/driving_log.csv','./data/driving_log.csv']
 image_path = []
 angles = []
@@ -147,12 +141,25 @@ for i,path in enumerate(csv_path):
 
 
 image_path = np.array(image_path)
-print("image_path",len(image_path))
 angles = np.array(angles)
-X_path_train, X_paths_test, Y_train, Y_test = train_test_split(image_path, angles,
-                                                                                  test_size=0.1, random_state=42)
+bin_count = 23
+avg_samples_per_bin =  len(angles)/bin_count
+hist, bins = np.histogram(angles, bin_count)
+
+delete_indices = []
+for i in range(len(angles)):
+    for j in range(bin_count):
+        if angles[i] > bins[j] and angles[i] <= bins[j+1] and np.random.rand() > avg_samples_per_bin/hist[j]:
+                delete_indices.append(i)
+image_path = np.delete(image_path, delete_indices, axis=0)
+angles = np.delete(angles, delete_indices)
+
+
+X_path_train, X_paths_test, Y_train, Y_test = train_test_split(image_path, angles, test_size=0.1)
 print('Train:', X_path_train.shape, Y_train.shape)
 print('Test:', X_paths_test.shape, Y_test.shape)
+
+
 
 
 # generators for train and validation data
