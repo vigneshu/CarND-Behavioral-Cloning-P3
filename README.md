@@ -120,7 +120,6 @@ ________________________________________________________________________________
 activation_8 (Activation)        (None, 10)            
 ____________________________________________________________________________________________________
 dense_4 (Dense)                  (None, 1)             
-====================================================================================================
 
 
 
@@ -143,14 +142,16 @@ The model consists of three convolution neural with 5x5 kernel size(o/p size 31x
 The data was skewed over zero driving angle and therefore certain images were deleted depending on the ratio of data distribution. The final data distribution after processing looks like this
 ![alt text][image1]
 
-To capture good driving behavior, I first recorded one lap on track two laps using center lane driving.I also recorded a lap where the car had to take a lot of recovery turns to get bck to the center of lane I also used the data provided by udacity. Here is an example image of center lane driving:
-Also I load the left, right and center camera images while adjusting the steering angle (+0.25 for the left frame and -0.25 for the right).
+
+To capture good driving behavior, I first recorded one lap on track two laps using center lane driving.I also recorded a lap where the car had to take a lot of recovery turns to get bck to the center of lane I also used the data provided by udacity. Also I load the left, right and center camera images while adjusting the steering angle (+0.25 for the left frame and -0.25 for the right). Here is an example image of center lane driving:
+
 ![alt text][image2]
 
-I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to .... These images show what a recovery looks like starting from ... :
+
+
+I then recorded the vehicle recovering from the left side and right sides of the road back to center so that the vehicle would learn to return to center if it goes off track. These images show what a recovery looks like.
 
 ![alt text][image3]
-![alt text][image4]
 ![alt text][image5]
 
 Then I repeated this process on track two in order to get more data points.
